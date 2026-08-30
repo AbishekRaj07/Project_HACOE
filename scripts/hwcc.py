@@ -77,6 +77,18 @@ def optional_plugin_command(
     ]
 
 
+def optional_analyzer_command(
+    ir_path: Path,
+    analyzer: Path | None,
+    output_path: Path,
+) -> list[str] | None:
+    if analyzer is None:
+        return None
+    if not analyzer.is_file():
+        raise PipelineError(f"IR analyzer does not exist: {analyzer}")
+    return [str(analyzer.resolve()), str(ir_path), "--output", str(output_path)]
+
+
 def build_commands(args: argparse.Namespace) -> Iterable[list[str]]:
     source = args.source.resolve()
     compiler_name = validate_source(source)
@@ -99,6 +111,14 @@ def build_commands(args: argparse.Namespace) -> Iterable[list[str]]:
         "-o",
         str(raw_ir),
     ]
+
+    analyzer_command = optional_analyzer_command(
+        raw_ir,
+        args.ir_analyzer,
+        output_dir / f"{source.stem}.features.json",
+    )
+    if analyzer_command:
+        yield analyzer_command
 
     feature_command = optional_plugin_command(
         opt, raw_ir, args.feature_plugin, "extract-features"
@@ -142,6 +162,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--feature-plugin", type=Path)
     parser.add_argument("--hardware-plugin", type=Path)
+    parser.add_argument(
+        "--ir-analyzer",
+        type=Path,
+        help="write a versioned JSON feature document with this analyzer binary",
+    )
     parser.add_argument("--run", dest="run_binary", action="store_true")
     parser.add_argument(
         "--program-arg", action="append", default=[], help="argument passed to the output binary"
