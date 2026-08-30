@@ -1,30 +1,49 @@
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <cstdint>
 
 using namespace llvm;
 
 namespace {
 struct HardwareAwarePass : public PassInfoMixin<HardwareAwarePass> {
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
-        // Hardcoded thresholds for AMD Ryzen 5 from the EDM
-        const double HARDWARE_RIDGE_POINT = 2.0; 
-        
-        // Simulating the ratio detected in the previous pass
-        double current_ratio = 9.0; // Simulated un-canonicalized ratio
+        // Phase 0 heuristic. Later phases will load a measured hardware profile.
+        constexpr double MemoryToMathThreshold = 2.0;
+        std::uint64_t memoryInstructions = 0;
+        std::uint64_t mathInstructions = 0;
+
+        for (BasicBlock &BB : F) {
+            for (Instruction &I : BB) {
+                if (isa<LoadInst>(I) || isa<StoreInst>(I)) {
+                    ++memoryInstructions;
+                } else if (isa<BinaryOperator>(I)) {
+                    ++mathInstructions;
+                }
+            }
+        }
+
+        const double currentRatio = mathInstructions == 0
+            ? static_cast<double>(memoryInstructions)
+            : static_cast<double>(memoryInstructions) /
+                  static_cast<double>(mathInstructions);
 
         errs() << "[HACOE Engine] Evaluating AVX2 Profitability for: " << F.getName() << "\n";
 
-        if (current_ratio > HARDWARE_RIDGE_POINT) {
-            errs() << "  -> [ABORT] Arithmetic Intensity is too low (" << (1.0/current_ratio) << ").\n";
-            errs() << "  -> [WARNING] Forcing AVX2 will cause L2 Cache Starvation (Thrashing).\n";
-            errs() << "  -> [DIAGNOSTIC] Phase Ordering failure: Run 'mem2reg' and 'loop-rotate' before vectorization.\n";
+        errs() << "  -> Memory instructions: " << memoryInstructions << "\n";
+        errs() << "  -> Math instructions: " << mathInstructions << "\n";
+        errs() << "  -> Memory-to-math ratio: " << currentRatio << "\n";
+
+        if (currentRatio > MemoryToMathThreshold) {
+            errs() << "  -> [RECOMMENDATION] Keep the baseline pipeline; the function appears memory-heavy.\n";
         } else {
-            errs() << "  -> [SUCCESS] Code is compute-bound. Injecting AVX2 pragmas...\n";
-            // Logic to inject llvm.loop.vectorize.enable would go here
+            errs() << "  -> [RECOMMENDATION] Evaluate vectorization profitability in Phase 3.\n";
         }
 
+        // This pass currently reports a recommendation and does not mutate IR.
         return PreservedAnalyses::all();
     }
 };

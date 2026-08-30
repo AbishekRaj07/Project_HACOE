@@ -1,75 +1,65 @@
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/Support/SourceMgr.h"
+#include "hacoe/IRFeatures.h"
+
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <memory>
 #include <string>
+#include <system_error>
 
-using namespace llvm;
+namespace {
+
+llvm::cl::opt<std::string> InputFilename(
+    llvm::cl::Positional,
+    llvm::cl::Required,
+    llvm::cl::desc("<LLVM IR or bitcode file>")
+);
+
+llvm::cl::opt<std::string> OutputFilename(
+    "output",
+    llvm::cl::desc("Write JSON to this file ('-' means stdout)"),
+    llvm::cl::value_desc("path"),
+    llvm::cl::init("-")
+);
+
+} // namespace
 
 int main(int argc, char **argv) {
-    if (argc < 2) {
-        errs() << "Usage: " << argv[0] << " <path_to_ir_file.ll>\n";
-        return 1;
+    llvm::InitLLVM initialization(argc, argv);
+    llvm::cl::ParseCommandLineOptions(
+        argc,
+        argv,
+        "HACOE deterministic LLVM IR feature analyzer\n"
+    );
+
+    llvm::LLVMContext context;
+    llvm::SMDiagnostic diagnostic;
+    std::unique_ptr<llvm::Module> module =
+        llvm::parseIRFile(InputFilename, diagnostic, context);
+    if (!module) {
+        diagnostic.print(argv[0], llvm::errs());
+        return 2;
     }
 
-    StringRef InputFilename = argv[1];
-    LLVMContext Context;
-    SMDiagnostic Err;
-
-    // Load the LLVM IR file
-    std::unique_ptr<Module> M = parseIRFile(InputFilename, Err, Context);
-    
-    if (!M) {
-        Err.print(argv[0], errs());
-        return 1;
+    const hacoe::ModuleFeatures features = hacoe::analyzeModule(*module);
+    if (OutputFilename == "-") {
+        hacoe::writeJson(llvm::outs(), features);
+        return 0;
     }
 
-    outs() << "========================================\n";
-    outs() << "   HACOE Static IR Topology Analyzer    \n";
-    outs() << "========================================\n";
-    outs() << "Target Module: " << M->getModuleIdentifier() << "\n\n";
-
-    int total_functions = 0;
-    int total_blocks = 0;
-    int total_instructions = 0;
-
-    // Iterate over all functions in the module
-    for (Function &F : *M) {
-        if (F.isDeclaration()) continue; // Skip external functions (like printf)
-
-        total_functions++;
-        outs() << "[Function] " << F.getName() << "\n";
-        
-        int func_blocks = 0;
-        int func_insts = 0;
-
-        // Iterate over all Basic Blocks in the function
-        for (BasicBlock &BB : F) {
-            func_blocks++;
-            total_blocks++;
-            
-            // Iterate over all Instructions in the Basic Block
-            for (Instruction &I : BB) {
-                func_insts++;
-                total_instructions++;
-            }
-        }
-        
-        outs() << "  -> Basic Blocks: " << func_blocks << "\n";
-        outs() << "  -> Instructions: " << func_insts << "\n";
+    std::error_code error;
+    llvm::raw_fd_ostream output(OutputFilename, error, llvm::sys::fs::OF_Text);
+    if (error) {
+        llvm::errs() << "hacoe-ir-analyzer: cannot open '" << OutputFilename
+                     << "': " << error.message() << '\n';
+        return 3;
     }
-
-    outs() << "----------------------------------------\n";
-    outs() << "Global Topology Summary:\n";
-    outs() << "Total Functions Identified : " << total_functions << "\n";
-    outs() << "Total Basic Blocks (Nodes) : " << total_blocks << "\n";
-    outs() << "Total Instructions (Edges) : " << total_instructions << "\n";
-    outs() << "========================================\n";
-
+    hacoe::writeJson(output, features);
     return 0;
 }

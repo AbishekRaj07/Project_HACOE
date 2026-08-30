@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hacoe.dev/schemas/ir-features-v1.schema.json",
+  "title": "HACOE LLVM IR feature document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "module_sha256",
+    "source_file",
+    "target_triple",
+    "data_layout",
+    "summary",
+    "functions"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "module_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_file": { "type": "string" },
+    "target_triple": { "type": "string" },
+    "data_layout": { "type": "string" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defined_functions", "declarations", "basic_blocks", "instructions"],
+      "properties": {
+        "defined_functions": { "$ref": "#/$defs/count" },
+        "declarations": { "$ref": "#/$defs/count" },
+        "basic_blocks": { "$ref": "#/$defs/count" },
+        "instructions": { "$ref": "#/$defs/count" }
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/function" }
+    }
+  },
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "basic_blocks",
+        "cfg_edges",
+        "instructions",
+        "loops",
+        "maximum_loop_depth",
+        "conditional_branches",
+        "unconditional_branches",
+        "switches",
+        "calls",
+        "indirect_calls",
+        "loads",
+        "stores",
+        "atomics",
+        "vector_instructions",
+        "opcode_histogram"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "basic_blocks": { "$ref": "#/$defs/count" },
+        "cfg_edges": { "$ref": "#/$defs/count" },
+        "instructions": { "$ref": "#/$defs/count" },
+        "loops": { "$ref": "#/$defs/count" },
+        "maximum_loop_depth": { "$ref": "#/$defs/count" },
+        "conditional_branches": { "$ref": "#/$defs/count" },
+        "unconditional_branches": { "$ref": "#/$defs/count" },
+        "switches": { "$ref": "#/$defs/count" },
+        "calls": { "$ref": "#/$defs/count" },
+        "indirect_calls": { "$ref": "#/$defs/count" },
+        "loads": { "$ref": "#/$defs/count" },
+        "stores": { "$ref": "#/$defs/count" },
+        "atomics": { "$ref": "#/$defs/count" },
+        "vector_instructions": { "$ref": "#/$defs/count" },
+        "opcode_histogram": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/count" }
+        }
+      }
+    }
+  }
+}

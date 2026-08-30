@@ -12,10 +12,12 @@
 *.out
 *.app
 build/
+hacoe-out/
 llvm_passes/build/
 omni_analyzer
 hardware_profile.json
 cfg_features.json
+perf_metrics.json
 __pycache__/
 *.pyc
 *~
