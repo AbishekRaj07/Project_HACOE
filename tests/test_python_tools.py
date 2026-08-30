@@ -37,6 +37,30 @@ class HwccTests(unittest.TestCase):
             self.assertIn("-passes=default<O2>", commands[1])
             self.assertEqual(commands[2][0], "clang")
 
+    def test_inserts_explicit_ir_analyzer_after_frontend(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            source = directory / "sample.c"
+            source.write_text("int main(void) { return 0; }\n", encoding="utf-8")
+            analyzer = directory / "hacoe-ir-analyzer"
+            analyzer.write_text("test placeholder\n", encoding="utf-8")
+            args = hwcc.parse_args(
+                [
+                    str(source),
+                    "--output-dir",
+                    str(directory / "out"),
+                    "--ir-analyzer",
+                    str(analyzer),
+                    "--dry-run",
+                ]
+            )
+
+            commands = list(hwcc.build_commands(args))
+
+            self.assertEqual(commands[1][0], str(analyzer.resolve()))
+            self.assertEqual(commands[1][-2], "--output")
+            self.assertTrue(commands[1][-1].endswith("sample.features.json"))
+
     def test_rejects_unsupported_source_extension(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             source = Path(temporary_directory) / "sample.rs"

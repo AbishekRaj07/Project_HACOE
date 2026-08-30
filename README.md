@@ -9,6 +9,8 @@ The current repository is **Phase 0 foundation work**, not a finished autonomous
 - Linux/x86 hardware discovery without a hard-coded CPU identity.
 - Human-readable and versioned JSON hardware-profile output.
 - Static LLVM IR topology analyzer.
+- Deterministic, versioned LLVM IR feature documents with CFG, loop, branch,
+  call, memory, vector, and opcode data.
 - LLVM pass plugins for feature diagnostics and an honest, non-mutating Phase 0 recommendation.
 - A validated C/C++ -> LLVM IR -> standard LLVM optimization -> native binary driver.
 - Repeatable Linux `perf stat` collection with JSON output and basic dispersion statistics.
@@ -56,6 +58,18 @@ Standard LLVM O2 pipeline:
 ```bash
 python3 scripts/hwcc.py tests/vector_add.c --output-dir hacoe-out --run
 ```
+
+Generate a Phase 1 feature document during compilation:
+
+```bash
+python3 scripts/hwcc.py tests/vector_add.c \
+  --output-dir hacoe-out \
+  --ir-analyzer build/hacoe-ir-analyzer
+```
+
+The contract is documented in
+[`docs/IR_FEATURE_CONTRACT.md`](docs/IR_FEATURE_CONTRACT.md) and formally
+defined by [`schemas/ir-features-v1.schema.json`](schemas/ir-features-v1.schema.json).
 
 Include the diagnostic plugins built by CMake:
 
