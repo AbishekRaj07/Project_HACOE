@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LLVM build dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang llvm-dev cmake ninja-build
+      - name: Run Python tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Run CTest
+        run: ctest --test-dir build --output-on-failure
+      - name: Validate hardware-profile JSON
+        run: ./build/hacoe-profiler --json | python3 -m json.tool
+      - name: Compiler-driver smoke test
+        run: python3 scripts/hwcc.py tests/vector_add.c --output-dir hacoe-out --run
